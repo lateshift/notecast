@@ -29,6 +29,9 @@ struct NoteCastTests {
 
         let summary = NoteFileImporter(modelContainer: container).importMarkdownFiles(at: [markdownURL])
         #expect(summary.importedNoteIDs.count == 1)
+        #expect(summary.importedNotificationPayloads.count == 1)
+        #expect(summary.importedNotificationPayloads.first?.id == summary.importedNoteIDs.first)
+        #expect(summary.importedNotificationPayloads.first?.title == "Dragged Note")
         #expect(summary.failures.isEmpty)
 
         let context = ModelContext(container)
@@ -39,6 +42,86 @@ struct NoteCastTests {
         #expect(notes.first?.mimetype == NotePersistence.defaultMimetype)
         #expect(notes.first?.created_via == NotePersistence.createdViaApp)
         #expect(notes.first?.folder == nil)
+    }
+
+    @MainActor
+    @Test func noteBrowserStoreCreateNoteReturnsNotificationPayload() throws {
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NoteCastBrowserStoreTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+
+        let storeURL = temporaryDirectory.appendingPathComponent("NoteCast.store")
+        let container = try makeTestModelContainer(storeURL: storeURL)
+        let store = NoteBrowserStore(modelContainer: container)
+        store.reload()
+
+        let payload = try #require(store.createNote())
+        #expect(payload.id != nil)
+        #expect(!payload.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        #expect(payload.preview == nil)
+
+        let context = ModelContext(container)
+        let notes = try context.fetch(FetchDescriptor<Note>())
+        #expect(notes.count == 1)
+        #expect(notes.first?.uuid == payload.id)
+        #expect(notes.first?.displayTitle == payload.title)
+    }
+
+    @Test func externalChangeSignalParsesTypedEventsAndLegacyTokens() throws {
+        let noteID = try #require(UUID(uuidString: "7D855790-9F45-4BDB-80D7-2B91E905E701"))
+        let event = NoteExternalChangeEvent(
+            kind: .noteAdded,
+            revisionToken: "typed-token",
+            noteID: noteID,
+            title: "Typed event",
+            preview: "Preview"
+        )
+        let eventData = try JSONEncoder().encode(event)
+        let eventText = try #require(String(data: eventData, encoding: .utf8))
+
+        #expect(NoteExternalChangeSignal.event(fromRevisionFileText: eventText) == event)
+        #expect(NoteExternalChangeSignal.revisionToken(fromRevisionFileText: eventText) == "typed-token")
+        #expect(NoteExternalChangeSignal.event(fromRevisionFileText: "legacy-token\n") == nil)
+        #expect(NoteExternalChangeSignal.revisionToken(fromRevisionFileText: "legacy-token\n") == "legacy-token")
+        #expect(NoteExternalChangeSignal.revisionToken(fromRevisionFileText: " \n ") == nil)
+    }
+
+    @Test func castMutationsWriteTypedExternalChangeEvents() throws {
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("NoteCastCastEventTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+
+        let storeURL = temporaryDirectory.appendingPathComponent("NoteCast.store")
+        let add = try runCast(
+            ["add", "--title", "CLI event title", "--json", "CLI event body"],
+            storeURL: storeURL
+        )
+        try requireSuccess(add)
+        let addedRecord = try decodeRecord(from: add.stdout)
+        let addedEvent = try readRevisionEvent(forStoreAt: storeURL)
+        #expect(addedEvent.kind == .noteAdded)
+        #expect(addedEvent.noteID?.uuidString == addedRecord.id)
+        #expect(addedEvent.title == "CLI event title")
+        #expect(addedEvent.preview == "CLI event body")
+
+        let update = try runCast(
+            ["update", addedRecord.id, "--json", "updated body"],
+            storeURL: storeURL
+        )
+        try requireSuccess(update)
+        let updatedEvent = try readRevisionEvent(forStoreAt: storeURL)
+        #expect(updatedEvent.kind == .notesChanged)
+        #expect(updatedEvent.noteID == nil)
+        #expect(updatedEvent.title == nil)
+
+        let delete = try runCast(["delete", addedRecord.id, "--json"], storeURL: storeURL)
+        try requireSuccess(delete)
+        let deletedEvent = try readRevisionEvent(forStoreAt: storeURL)
+        #expect(deletedEvent.kind == .notesChanged)
+        #expect(deletedEvent.noteID == nil)
+        #expect(deletedEvent.title == nil)
     }
 
     @Test func pipedQuickAddFencesCommandOutputButAutomationStaysExact() throws {
@@ -133,6 +216,14 @@ struct NoteCastTests {
 
     private func decodeRecord(from json: String) throws -> CastNoteRecord {
         try JSONDecoder().decode(CastNoteRecord.self, from: Data(json.utf8))
+    }
+
+    private func readRevisionEvent(forStoreAt storeURL: URL) throws -> NoteExternalChangeEvent {
+        let revisionURL = storeURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(NoteExternalChangeSignal.revisionFileName)
+        let text = try String(contentsOf: revisionURL, encoding: .utf8)
+        return try #require(NoteExternalChangeSignal.event(fromRevisionFileText: text))
     }
 
     private func requireSuccess(_ result: CastProcessResult) throws {

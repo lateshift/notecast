@@ -27,10 +27,18 @@ struct NoteCastApp: App {
 
     init() {
         let container = NotePersistence.makeModelContainerOrCrash()
-        let manager = NoteWindowManager(modelContainer: container)
+        let notificationScheduler: NoteNotificationScheduling = UITestingSupport.isEnabled || PreviewRuntime.isActive
+            ? NoOpNoteNotificationScheduler()
+            : NoteNotificationController()
+        let manager = NoteWindowManager(
+            modelContainer: container,
+            notificationScheduler: notificationScheduler
+        )
         self.modelContainer = container
         self._windowManager = StateObject(wrappedValue: manager)
         appDelegate.configure(modelContainer: container, windowManager: manager)
+
+        manager.requestNotificationAuthorizationIfNeeded()
 
         // UI tests need a predictable harness window they can automate. The
         // production app opens the normal NoteCast window; this extra harness
@@ -183,6 +191,7 @@ final class NoteCastAppDelegate: NSObject, NSApplicationDelegate {
 
         rememberImportedURLs(openFileEvent.urls)
         windowManager?.notesDidChange()
+        windowManager?.notifyNotesImported(summary.importedNotificationPayloads)
 
         if activateApp {
             NSApp.activate(ignoringOtherApps: true)

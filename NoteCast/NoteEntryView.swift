@@ -14,6 +14,7 @@ struct NoteEntryView: View {
 
     private let note: Note?
     private let didSave: () -> Void
+    private let didAddNote: (NoteAddedNotificationPayload) -> Void
     private let close: () -> Void
 
     @State private var title: String
@@ -23,10 +24,12 @@ struct NoteEntryView: View {
     init(
         note: Note?,
         didSave: @escaping () -> Void = {},
+        didAddNote: @escaping (NoteAddedNotificationPayload) -> Void = { _ in },
         close: @escaping () -> Void
     ) {
         self.note = note
         self.didSave = didSave
+        self.didAddNote = didAddNote
         self.close = close
         self._title = State(initialValue: note?.displayTitle ?? "")
         self._text = State(initialValue: note?.text ?? "")
@@ -83,6 +86,7 @@ struct NoteEntryView: View {
             return
         }
 
+        var addedPayload: NoteAddedNotificationPayload?
         if let note {
             // Editing keeps the original creation metadata and only changes the
             // body, MIME type, and update timestamp.
@@ -101,11 +105,15 @@ struct NoteEntryView: View {
                 created_via: NotePersistence.createdViaApp
             )
             modelContext.insert(newNote)
+            addedPayload = NoteAddedNotificationPayload(note: newNote)
         }
 
         do {
             try modelContext.save()
             didSave()
+            if let addedPayload {
+                didAddNote(addedPayload)
+            }
             close()
         } catch {
             // `localizedDescription` can be too vague for SwiftData/Core Data

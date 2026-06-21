@@ -223,7 +223,7 @@ final class NoteBrowserStore: ObservableObject {
     /// user is editing. The compact menu-bar entry window still requires text
     /// before save because it is designed for quick one-shot capture.
     @discardableResult
-    func createNote() -> Bool {
+    func createNote() -> NoteAddedNotificationPayload? {
         do {
             let createdAt = Date.now
             let note = Note(
@@ -239,11 +239,12 @@ final class NoteBrowserStore: ObservableObject {
             try context.save()
 
             let newNoteID = note.uuid
+            let payload = NoteAddedNotificationPayload(note: note, includePreview: false)
             reload(selecting: newNoteID)
-            return true
+            return payload
         } catch {
             errorMessage = "Could not create note: \(String(describing: error))"
-            return false
+            return nil
         }
     }
 

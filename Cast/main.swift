@@ -202,7 +202,11 @@ private final class CastCommand {
         )
         context.insert(note)
         try context.save()
-        NoteExternalChangeSignal.publishNotesDidChange()
+        NoteExternalChangeSignal.publishNoteAdded(
+            noteID: note.uuid,
+            title: note.displayTitle,
+            preview: note.bodyPreview
+        )
 
         if wantsJSON {
             try printJSON(NoteRecord(note: note, includeText: true))

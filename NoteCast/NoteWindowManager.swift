@@ -19,6 +19,7 @@ import SwiftUI
 @MainActor
 final class NoteWindowManager: NSObject, ObservableObject {
     private let modelContainer: ModelContainer
+    private let notificationScheduler: NoteNotificationScheduling
 
     /// Incremented whenever an app window changes the note database.
     ///
@@ -46,8 +47,9 @@ final class NoteWindowManager: NSObject, ObservableObject {
     /// Debounces bursts of filesystem events caused by atomic revision-file writes.
     private var revisionDirectoryDebounce: DispatchWorkItem?
 
-    init(modelContainer: ModelContainer) {
+    init(modelContainer: ModelContainer, notificationScheduler: NoteNotificationScheduling) {
         self.modelContainer = modelContainer
+        self.notificationScheduler = notificationScheduler
         super.init()
 
         startExternalChangeMonitoring()
@@ -81,6 +83,8 @@ final class NoteWindowManager: NSObject, ObservableObject {
 
         let view = NoteEntryView(note: noteForWindow, didSave: { [weak self] in
             self?.notesDidChange()
+        }, didAddNote: { [weak self] payload in
+            self?.notifyNoteAdded(payload)
         }) { [weak self] in
             self?.closeWindow(id)
         }
@@ -146,6 +150,18 @@ final class NoteWindowManager: NSObject, ObservableObject {
     /// path as the real menu bar menu.
     func notesDidChange() {
         notesRevision += 1
+    }
+
+    func requestNotificationAuthorizationIfNeeded() {
+        notificationScheduler.requestAuthorizationIfNeeded()
+    }
+
+    func notifyNoteAdded(_ payload: NoteAddedNotificationPayload) {
+        notificationScheduler.notifyNoteAdded(payload)
+    }
+
+    func notifyNotesImported(_ notes: [NoteAddedNotificationPayload]) {
+        notificationScheduler.notifyNotesImported(notes)
     }
 
     /// Listen for changes written by the separate `cast` CLI process.
@@ -216,6 +232,17 @@ final class NoteWindowManager: NSObject, ObservableObject {
     /// revision file could not be read, because the notification itself means an
     /// external writer believes the store changed.
     private func refreshFromExternalSignal(force: Bool) {
+        if let event = NoteExternalChangeSignal.currentRevisionEvent() {
+            guard event.revisionToken != observedExternalRevisionToken else {
+                return
+            }
+
+            observedExternalRevisionToken = event.revisionToken
+            notesDidChange()
+            notifyIfNeeded(for: event)
+            return
+        }
+
         if let latestToken = NoteExternalChangeSignal.currentRevisionToken() {
             guard latestToken != observedExternalRevisionToken else {
                 return
@@ -226,6 +253,19 @@ final class NoteWindowManager: NSObject, ObservableObject {
         } else if force {
             notesDidChange()
         }
+    }
+
+    private func notifyIfNeeded(for event: NoteExternalChangeEvent) {
+        guard event.kind == .noteAdded,
+              event.noteID != nil || event.title != nil else {
+            return
+        }
+
+        notificationScheduler.notifyNoteAdded(
+            id: event.noteID,
+            title: event.title ?? "Untitled note",
+            preview: event.preview
+        )
     }
 
     private func showWindow<Content: View>(

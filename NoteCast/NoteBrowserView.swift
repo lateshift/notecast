@@ -140,8 +140,9 @@ struct NoteBrowserView: View {
     }
 
     private func createNote() {
-        if store.createNote() {
+        if let payload = store.createNote() {
             windowManager.notesDidChange()
+            windowManager.notifyNoteAdded(payload)
         }
     }
 

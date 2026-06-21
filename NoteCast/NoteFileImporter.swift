@@ -25,6 +25,7 @@ struct NoteFileImporter {
     func importMarkdownFiles(at urls: [URL]) -> NoteFileImportSummary {
         let context = ModelContext(modelContainer)
         var importedNoteIDs: [UUID] = []
+        var importedNotificationPayloads: [NoteAddedNotificationPayload] = []
         var failures: [NoteFileImportFailure] = []
 
         for url in urls {
@@ -39,24 +40,37 @@ struct NoteFileImporter {
                 if let noteID = note.uuid {
                     importedNoteIDs.append(noteID)
                 }
+                importedNotificationPayloads.append(NoteAddedNotificationPayload(note: note))
             } catch {
                 failures.append(NoteFileImportFailure(url: url, errorDescription: Self.errorDescription(for: error)))
             }
         }
 
         guard !importedNoteIDs.isEmpty else {
-            return NoteFileImportSummary(importedNoteIDs: [], failures: failures)
+            return NoteFileImportSummary(
+                importedNoteIDs: [],
+                importedNotificationPayloads: [],
+                failures: failures
+            )
         }
 
         do {
             try context.save()
-            return NoteFileImportSummary(importedNoteIDs: importedNoteIDs, failures: failures)
+            return NoteFileImportSummary(
+                importedNoteIDs: importedNoteIDs,
+                importedNotificationPayloads: importedNotificationPayloads,
+                failures: failures
+            )
         } catch {
             let saveFailure = NoteFileImportFailure(
                 url: nil,
                 errorDescription: "Could not save imported notes: \(String(describing: error))"
             )
-            return NoteFileImportSummary(importedNoteIDs: [], failures: failures + [saveFailure])
+            return NoteFileImportSummary(
+                importedNoteIDs: [],
+                importedNotificationPayloads: [],
+                failures: failures + [saveFailure]
+            )
         }
     }
 
@@ -145,10 +159,11 @@ struct NoteFileImporter {
 
 struct NoteFileImportSummary {
     let importedNoteIDs: [UUID]
+    let importedNotificationPayloads: [NoteAddedNotificationPayload]
     let failures: [NoteFileImportFailure]
 
     var didImportNotes: Bool {
-        !importedNoteIDs.isEmpty
+        !importedNotificationPayloads.isEmpty
     }
 }
 
