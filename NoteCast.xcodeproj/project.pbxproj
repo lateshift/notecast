@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		4913B7452FE033080032AB81 /* Markdown in Frameworks */ = {isa = PBXBuildFile; productRef = 4913B7442FE033080032AB81 /* Markdown */; };
 		B0000000000000000000000A /* cast in Embed cast CLI */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* cast */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		B00000000000000000000010 /* notecast-cast in Embed agent skill */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000F /* notecast-cast */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -47,6 +48,17 @@
 			name = "Embed cast CLI";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B00000000000000000000011 /* Embed agent skill */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = skills;
+			dstSubfolderSpec = 7;
+			files = (
+				B00000000000000000000010 /* notecast-cast in Embed agent skill */,
+			);
+			name = "Embed agent skill";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -54,6 +66,7 @@
 		4913B6742FDFF6210032AB81 /* NoteCastTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NoteCastTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4913B67E2FDFF6210032AB81 /* NoteCastUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NoteCastUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B00000000000000000000003 /* cast */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = cast; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0000000000000000000000F /* notecast-cast */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "notecast-cast"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -136,10 +149,19 @@
 				4913B6672FDFF6200032AB81 /* NoteCast */,
 				B00000000000000000000001 /* Shared */,
 				B00000000000000000000002 /* Cast */,
+				B00000000000000000000012 /* skills */,
 				4913B6772FDFF6210032AB81 /* NoteCastTests */,
 				4913B6812FDFF6210032AB81 /* NoteCastUITests */,
 				4913B6662FDFF6200032AB81 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		B00000000000000000000012 /* skills */ = {
+			isa = PBXGroup;
+			children = (
+				B0000000000000000000000F /* notecast-cast */,
+			);
+			path = skills;
 			sourceTree = "<group>";
 		};
 		4913B6662FDFF6200032AB81 /* Products */ = {
@@ -164,6 +186,7 @@
 				4913B6622FDFF6200032AB81 /* Frameworks */,
 				4913B6632FDFF6200032AB81 /* Resources */,
 				B0000000000000000000000B /* Embed cast CLI */,
+				B00000000000000000000011 /* Embed agent skill */,
 			);
 			buildRules = (
 			);

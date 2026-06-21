@@ -55,6 +55,7 @@ struct NoteBrowserView: View {
                 deleteFolder: deleteFolder,
                 deleteNote: deleteNote,
                 copyNote: copyNote,
+                copyNoteUID: copyNoteUID,
                 moveDraggedNotes: moveDraggedNotes
             )
             .navigationSplitViewColumnWidth(min: 250, ideal: 310, max: 420)
@@ -65,7 +66,8 @@ struct NoteBrowserView: View {
                 createNote: createNote,
                 saveNote: saveNote,
                 deleteNote: deleteNote,
-                copyNote: copyNote
+                copyNote: copyNote,
+                copyNoteUID: copyNoteUID
             )
         }
         .navigationTitle("NoteCast")
@@ -177,6 +179,14 @@ struct NoteBrowserView: View {
         pasteboard.clearContents()
         pasteboard.setString(note.text, forType: .string)
     }
+
+    private func copyNoteUID(_ note: Note) {
+        guard let noteID = note.uuid else { return }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(noteID.uuidString, forType: .string)
+    }
 }
 
 // MARK: - Sidebar
@@ -194,6 +204,7 @@ private struct NoteBrowserSidebar: View {
     let deleteFolder: (NoteFolder) -> Void
     let deleteNote: (UUID) -> Void
     let copyNote: (Note) -> Void
+    let copyNoteUID: (Note) -> Void
     let moveDraggedNotes: (_ stableIDs: [String], _ folderID: UUID?) -> Bool
 
     var body: some View {
@@ -227,7 +238,7 @@ private struct NoteBrowserSidebar: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(store.searchResults, id: \.stableID) { note in
-                        NoteSidebarRow(note: note, copy: copyNote, delete: deleteNote)
+                        NoteSidebarRow(note: note, copy: copyNote, copyUID: copyNoteUID, delete: deleteNote)
                     }
                 }
             }
@@ -243,7 +254,7 @@ private struct NoteBrowserSidebar: View {
             if !store.unfiledNotes.isEmpty {
                 Section("Unfiled Notes") {
                     ForEach(store.unfiledNotes, id: \.stableID) { note in
-                        NoteSidebarRow(note: note, copy: copyNote, delete: deleteNote)
+                        NoteSidebarRow(note: note, copy: copyNote, copyUID: copyNoteUID, delete: deleteNote)
                     }
                 }
             }
@@ -256,6 +267,7 @@ private struct NoteBrowserSidebar: View {
                         rename: { renameFolder(folder) },
                         delete: { deleteFolder(folder) },
                         copyNote: copyNote,
+                        copyNoteUID: copyNoteUID,
                         deleteNote: deleteNote,
                         moveDraggedNotes: moveDraggedNotes
                     )
@@ -373,6 +385,7 @@ private struct NoteBrowserSidebar: View {
 private struct NoteSidebarRow: View {
     let note: Note
     let copy: (Note) -> Void
+    let copyUID: (Note) -> Void
     let delete: (UUID) -> Void
 
     var body: some View {
@@ -395,7 +408,7 @@ private struct NoteSidebarRow: View {
                 Label(note.displayTitle, systemImage: "note.text")
                     .padding(8)
             }
-            .noteActionsContextMenu(note: note, copy: copy, delete: delete)
+            .noteActionsContextMenu(note: note, copy: copy, copyUID: copyUID, delete: delete)
         }
     }
 }
@@ -407,6 +420,7 @@ private struct FolderDisclosureRow: View {
     let rename: () -> Void
     let delete: () -> Void
     let copyNote: (Note) -> Void
+    let copyNoteUID: (Note) -> Void
     let deleteNote: (UUID) -> Void
     let moveDraggedNotes: (_ stableIDs: [String], _ folderID: UUID?) -> Bool
 
@@ -419,7 +433,7 @@ private struct FolderDisclosureRow: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(notes) { note in
-                        NoteSidebarRow(note: note, copy: copyNote, delete: deleteNote)
+                        NoteSidebarRow(note: note, copy: copyNote, copyUID: copyNoteUID, delete: deleteNote)
                     }
                 }
             } label: {
@@ -450,6 +464,7 @@ private struct NoteBrowserDetail: View {
     let saveNote: (_ noteID: UUID, _ title: String, _ text: String, _ folderID: UUID?) -> Bool
     let deleteNote: (_ noteID: UUID) -> Void
     let copyNote: (Note) -> Void
+    let copyNoteUID: (Note) -> Void
 
     var body: some View {
         ZStack {
@@ -473,6 +488,7 @@ private struct NoteBrowserDetail: View {
                     },
                     createNote: createNote,
                     copyNote: copyNote,
+                    copyNoteUID: copyNoteUID,
                     deleteNote: deleteNote
                 )
             }
@@ -513,6 +529,7 @@ private struct NoteCollectionLanding: View {
     let select: (Note) -> Void
     let createNote: () -> Void
     let copyNote: (Note) -> Void
+    let copyNoteUID: (Note) -> Void
     let deleteNote: (UUID) -> Void
 
     var body: some View {
@@ -556,7 +573,7 @@ private struct NoteCollectionLanding: View {
                                 Label(note.displayTitle, systemImage: "note.text")
                                     .padding(8)
                             }
-                            .noteActionsContextMenu(note: note, copy: copyNote, delete: deleteNote)
+                            .noteActionsContextMenu(note: note, copy: copyNote, copyUID: copyNoteUID, delete: deleteNote)
                         }
                     }
                 }
@@ -571,11 +588,13 @@ private struct NoteCollectionLanding: View {
 ///
 /// The main window keeps the visible chrome focused on reading/editing. Less
 /// common note-level actions live with the note items themselves: right-click a
-/// note row or card to copy or delete it. The modifier owns the confirmation
-/// dialog so every item gets the same safe delete behavior.
+/// note row or card to copy its content, copy its UID, or delete it. The
+/// modifier owns the confirmation dialog so every item gets the same safe
+/// delete behavior.
 private struct NoteActionsContextMenu: ViewModifier {
     let note: Note
     let copy: (Note) -> Void
+    let copyUID: (Note) -> Void
     let delete: (UUID) -> Void
 
     @State private var isConfirmingDelete = false
@@ -588,6 +607,13 @@ private struct NoteActionsContextMenu: ViewModifier {
                 } label: {
                     Label("Copy Markdown", systemImage: "doc.on.doc")
                 }
+
+                Button {
+                    copyUID(note)
+                } label: {
+                    Label("Copy UID", systemImage: "number")
+                }
+                .disabled(note.uuid == nil)
 
                 Divider()
 
@@ -618,9 +644,10 @@ private extension View {
     func noteActionsContextMenu(
         note: Note,
         copy: @escaping (Note) -> Void,
+        copyUID: @escaping (Note) -> Void,
         delete: @escaping (UUID) -> Void
     ) -> some View {
-        modifier(NoteActionsContextMenu(note: note, copy: copy, delete: delete))
+        modifier(NoteActionsContextMenu(note: note, copy: copy, copyUID: copyUID, delete: delete))
     }
 }
 

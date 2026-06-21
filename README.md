@@ -18,6 +18,7 @@ https://github.com/user-attachments/assets/8b471507-fd8c-49c3-83b3-82946cdda25f
 - Compact quick-note window from the menu bar with `Cmd+Return` save.
 - Shared persistent store for the app and CLI.
 - Bundled `cast` CLI for terminal, scripts, pipes, and coding agents.
+- Bundled Agent Skills helper so agents can discover safe `cast` workflows from the app package.
 
 ## Main app workflow
 
@@ -33,10 +34,11 @@ The menu bar extra remains available while the full app is running. Use it for q
 
 ## CLI quick start
 
-The app embeds the CLI at:
+The app embeds the CLI and its Agent Skills helper at:
 
 ```text
 NoteCast.app/Contents/Resources/bin/cast
+NoteCast.app/Contents/Resources/skills/notecast-cast/SKILL.md
 ```
 
 Install a convenient shell command:
@@ -68,14 +70,26 @@ SwiftData notes, not SQLite FTS.
 
 ## Agent skill installation
 
-This repository includes an Agent Skills-compatible helper at `skills/notecast-cast/` so coding agents know how to use the `cast` CLI safely. Install it by symlinking or copying that directory into your agent's skills directory:
+This repository includes an Agent Skills-compatible helper at `skills/notecast-cast/` so coding agents know how to use the `cast` CLI safely. App builds also package the same skill at:
+
+```text
+/Applications/NoteCast.app/Contents/Resources/skills/notecast-cast
+```
+
+Install it by symlinking or copying the packaged skill into your agent's skills directory:
 
 ```bash
-# From the NoteCast repository root
+APP_SKILL="/Applications/NoteCast.app/Contents/Resources/skills/notecast-cast"
 mkdir -p ~/.codex/skills ~/.claude/skills ~/.pi/agent/skills
-ln -sfn "$PWD/skills/notecast-cast" ~/.codex/skills/notecast-cast   # Codex
-ln -sfn "$PWD/skills/notecast-cast" ~/.claude/skills/notecast-cast   # Claude
-ln -sfn "$PWD/skills/notecast-cast" ~/.pi/agent/skills/notecast-cast # Pi
+ln -sfn "$APP_SKILL" ~/.codex/skills/notecast-cast   # Codex
+ln -sfn "$APP_SKILL" ~/.claude/skills/notecast-cast   # Claude
+ln -sfn "$APP_SKILL" ~/.pi/agent/skills/notecast-cast # Pi
+```
+
+When developing from a checkout, you can link the source copy instead:
+
+```bash
+ln -sfn "$PWD/skills/notecast-cast" ~/.codex/skills/notecast-cast
 ```
 
 Restart the agent after installing. The skill expects either `cast` to be on `PATH` or the bundled command to exist at `/Applications/NoteCast.app/Contents/Resources/bin/cast`.
@@ -119,6 +133,8 @@ xcodebuild -project NoteCast.xcodeproj -scheme NoteCast -configuration Debug bui
 xcodebuild -project NoteCast.xcodeproj -scheme cast -configuration Debug build
 ```
 
+Building the `NoteCast` scheme packages both `Contents/Resources/bin/cast` and `Contents/Resources/skills/notecast-cast` into the app bundle.
+
 Run tests:
 
 ```bash
@@ -139,4 +155,5 @@ NoteCast/github-markdown.css       Vendored github-markdown-css preview styleshe
 NoteCast/LaunchAtLoginController.swift Start at Login registration wrapper
 NoteCast/NoteMenuView.swift        Menu bar menu
 Cast/main.swift                    cast CLI
+skills/notecast-cast/SKILL.md      Agent skill for safe cast CLI workflows
 ```
