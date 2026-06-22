@@ -55,7 +55,6 @@ struct CommandPaletteItem: Identifiable, Equatable {
 }
 
 enum CommandPaletteItemKind: Equatable {
-    case note(UUID)
     case folder(UUID)
     case command(CommandPaletteCommand)
 }
@@ -219,9 +218,8 @@ enum CommandPaletteCommand: String, CaseIterable, Equatable {
 
 /// Pure search/ranking layer for the command palette.
 ///
-/// Notes use the shared `NoteSearch` scorer so palette note results match the
-/// sidebar and CLI behavior. Folders and static commands use a small local
-/// matcher because they are lightweight metadata, not full note bodies.
+/// Folders and static commands use a small local matcher because they are
+/// lightweight metadata, not full note bodies.
 enum CommandPaletteSearch {
     static func sections(
         notes: [Note],
@@ -243,7 +241,6 @@ enum CommandPaletteSearch {
     ) -> [CommandPaletteSection] {
         [
             section(title: "Commands", items: commandItems(context: context, query: nil)),
-            section(title: "Recent Notes", items: notes.prefix(8).compactMap { noteItem(note: $0, score: 0) }),
             section(title: "Folders", items: folders.prefix(8).compactMap { folderItem(folder: $0, notes: notes, score: 0) })
         ].compactMap { $0 }
     }
@@ -254,10 +251,6 @@ enum CommandPaletteSearch {
         query: String,
         context: CommandPaletteContext
     ) -> [CommandPaletteSection] {
-        let noteItems = NoteSearch.search(notes, query: query)
-            .prefix(10)
-            .compactMap { noteItem(note: $0.note, score: $0.score) }
-
         let folderItems = folders.compactMap { folder -> CommandPaletteItem? in
             let score = CommandPaletteText.score(query: query, candidates: [folder.displayName])
             guard score > 0 else { return nil }
@@ -269,7 +262,6 @@ enum CommandPaletteSearch {
         let commandItems = commandItems(context: context, query: query)
 
         return [
-            section(title: "Notes", items: Array(noteItems)),
             section(title: "Folders", items: Array(folderItems)),
             section(title: "Commands", items: commandItems)
         ].compactMap { $0 }
@@ -277,21 +269,6 @@ enum CommandPaletteSearch {
 
     private static func section(title: String, items: [CommandPaletteItem]) -> CommandPaletteSection? {
         items.isEmpty ? nil : CommandPaletteSection(title: title, items: items)
-    }
-
-    private static func noteItem(note: Note, score: Int) -> CommandPaletteItem? {
-        guard let noteID = note.uuid else { return nil }
-        let folderName = note.folder?.displayName ?? "Unfiled"
-        return CommandPaletteItem(
-            id: "note-\(noteID.uuidString)",
-            kind: .note(noteID),
-            title: note.displayTitle,
-            subtitle: "\(folderName) - \(note.bodyPreview)",
-            systemImage: "note.text",
-            shortcutHint: "Cmd+Return",
-            isEnabled: true,
-            score: score
-        )
     }
 
     private static func folderItem(folder: NoteFolder, notes: [Note], score: Int) -> CommandPaletteItem? {

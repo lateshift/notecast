@@ -40,7 +40,7 @@ final class CommandPaletteUITests: XCTestCase {
     }
 
     @MainActor
-    func testCommandPaletteSearchesAndOpensNote() throws {
+    func testCommandPaletteExcludesNotesAndMovesSelectionWithArrowKeys() throws {
         let targetTitle = "Palette target \(UUID().uuidString)"
         let otherTitle = "Later note \(UUID().uuidString)"
         try seedNotes([
@@ -60,14 +60,26 @@ final class CommandPaletteUITests: XCTestCase {
 
         pasteTextIntoFocusedEditor(targetTitle)
 
-        let result = app.buttons
+        let noteResult = app.buttons
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "CommandPalette.row.note-"))
             .firstMatch
-        XCTAssertTrue(result.waitForExistence(timeout: 5), app.debugDescription)
-        result.click()
+        XCTAssertFalse(noteResult.waitForExistence(timeout: 1), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["No Results"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
 
-        XCTAssertFalse(paletteRow.waitForExistence(timeout: 2), app.debugDescription)
-        XCTAssertTrue(app.staticTexts[targetTitle].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+        app.typeKey("a", modifierFlags: [.command])
+        pasteTextIntoFocusedEditor("show")
+
+        let showAllNotesRow = app.buttons["CommandPalette.row.command-showAllNotes"].firstMatch
+        let showUnfiledRow = app.buttons["CommandPalette.row.command-showUnfiled"].firstMatch
+        XCTAssertTrue(showAllNotesRow.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(showUnfiledRow.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(showAllNotesRow.value as? String, "Selected")
+
+        app.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertEqual(showUnfiledRow.value as? String, "Selected")
+
+        app.typeKey(.upArrow, modifierFlags: [])
+        XCTAssertEqual(showAllNotesRow.value as? String, "Selected")
     }
 
     private func seedNotes(_ notes: [[String: String]]) throws {

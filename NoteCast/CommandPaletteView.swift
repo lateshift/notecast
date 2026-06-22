@@ -5,6 +5,7 @@
 //  Keyboard-first command palette overlay.
 //
 
+import AppKit
 import SwiftUI
 
 /// Floating command palette shown over the main browser window.
@@ -18,7 +19,6 @@ struct CommandPaletteView: View {
 
     @State private var query = ""
     @State private var selectedItemID: String?
-    @FocusState private var isSearchFocused: Bool
 
     private var sections: [CommandPaletteSection] {
         CommandPaletteSearch.sections(
@@ -35,8 +35,9 @@ struct CommandPaletteView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.16)
+            Color.clear
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
                 .onTapGesture(perform: close)
 
             VStack(spacing: 0) {
@@ -48,13 +49,12 @@ struct CommandPaletteView: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(.white.opacity(0.22), lineWidth: 1)
+                    .stroke(.black.opacity(0.20), lineWidth: 1)
             }
             .shadow(color: .black.opacity(0.22), radius: 24, y: 12)
 
-            // SwiftUI TextField handles plain Return through `onSubmit`.
-            // This invisible button gives the palette a normal command-key
-            // shortcut for the secondary action without custom AppKit key code.
+            // Keep the secondary action registered as a normal command-key
+            // shortcut even when focus temporarily leaves the search field.
             Button(action: performSecondarySelectedItem) {
                 EmptyView()
             }
@@ -65,9 +65,6 @@ struct CommandPaletteView: View {
         }
         .onAppear {
             selectFirstEnabledItem()
-            DispatchQueue.main.async {
-                isSearchFocused = true
-            }
         }
         .onChange(of: query) { _, _ in
             selectFirstEnabledItem()
@@ -84,12 +81,16 @@ struct CommandPaletteView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
 
-            TextField("Search notes and commands", text: $query)
-                .textFieldStyle(.plain)
-                .font(.title3)
-                .focused($isSearchFocused)
-                .onSubmit(performSelectedItem)
-                .accessibilityIdentifier("CommandPalette.searchField")
+            CommandPaletteSearchField(
+                text: $query,
+                placeholder: "Search commands and folders",
+                onMove: moveSelection,
+                onSubmit: performSelectedItem,
+                onSecondarySubmit: performSecondarySelectedItem,
+                onEscape: close
+            )
+            .frame(height: 26)
+            .accessibilityIdentifier("CommandPalette.searchField")
 
             if !query.isEmpty {
                 Button {
@@ -246,5 +247,93 @@ private struct CommandPaletteRow: View {
         .disabled(!item.isEnabled)
         .accessibilityIdentifier("CommandPalette.row.\(item.id)")
         .accessibilityLabel(item.title)
+        .accessibilityValue(isSelected ? "Selected" : "")
+    }
+}
+
+private struct CommandPaletteSearchField: NSViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    let onMove: (MoveCommandDirection) -> Void
+    let onSubmit: () -> Void
+    let onSecondarySubmit: () -> Void
+    let onEscape: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let textField = NSTextField()
+        textField.delegate = context.coordinator
+        textField.placeholderString = placeholder
+        textField.isBordered = false
+        textField.drawsBackground = false
+        textField.focusRingType = .none
+        textField.font = .systemFont(ofSize: 20)
+        textField.lineBreakMode = .byTruncatingTail
+        textField.usesSingleLineMode = true
+        textField.cell?.sendsActionOnEndEditing = false
+        context.coordinator.focusIfNeeded(textField)
+        return textField
+    }
+
+    func updateNSView(_ textField: NSTextField, context: Context) {
+        context.coordinator.parent = self
+        if textField.stringValue != text {
+            textField.stringValue = text
+        }
+        textField.placeholderString = placeholder
+        context.coordinator.focusIfNeeded(textField)
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: CommandPaletteSearchField
+        private var didFocus = false
+
+        init(parent: CommandPaletteSearchField) {
+            self.parent = parent
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let textField = notification.object as? NSTextField else { return }
+            parent.text = textField.stringValue
+        }
+
+        func control(
+            _ control: NSControl,
+            textView: NSTextView,
+            doCommandBy commandSelector: Selector
+        ) -> Bool {
+            switch commandSelector {
+            case #selector(NSResponder.moveDown(_:)):
+                parent.onMove(.down)
+                return true
+            case #selector(NSResponder.moveUp(_:)):
+                parent.onMove(.up)
+                return true
+            case #selector(NSResponder.insertNewline(_:)):
+                if NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command) == true {
+                    parent.onSecondarySubmit()
+                } else {
+                    parent.onSubmit()
+                }
+                return true
+            case #selector(NSResponder.cancelOperation(_:)):
+                parent.onEscape()
+                return true
+            default:
+                return false
+            }
+        }
+
+        func focusIfNeeded(_ textField: NSTextField) {
+            guard !didFocus else { return }
+            DispatchQueue.main.async { [weak self, weak textField] in
+                guard let self, let textField, let window = textField.window else { return }
+                window.makeFirstResponder(textField)
+                self.didFocus = true
+            }
+        }
     }
 }

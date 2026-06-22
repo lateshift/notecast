@@ -266,9 +266,6 @@ struct NoteBrowserView: View {
         guard item.isEnabled else { return }
 
         switch item.kind {
-        case .note(let noteID):
-            store.selection = .note(noteID)
-            closeCommandPalette()
         case .folder(let folderID):
             store.searchText = ""
             store.selection = .folder(folderID)
@@ -282,10 +279,6 @@ struct NoteBrowserView: View {
         guard item.isEnabled else { return }
 
         switch item.kind {
-        case .note(let noteID):
-            store.selection = .note(noteID)
-            editorMode = .edit
-            closeCommandPalette()
         case .folder, .command:
             performPaletteItem(item)
         }

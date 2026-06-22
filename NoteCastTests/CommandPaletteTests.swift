@@ -11,7 +11,7 @@ import Testing
 
 struct CommandPaletteTests {
     @MainActor
-    @Test func paletteNoteSearchUsesSharedNoteRanking() throws {
+    @Test func paletteDoesNotSearchNotes() {
         let target = Note(
             title: "Command Palette Spec",
             text: "Keyboard-first navigation for notes and folders.",
@@ -28,12 +28,11 @@ struct CommandPaletteTests {
         let sections = CommandPaletteSearch.sections(
             notes: [other, target],
             folders: [],
-            query: "command palette",
+            query: "command palette spec",
             context: CommandPaletteContext(selectedNoteID: nil, selectedNoteTitle: nil)
         )
 
-        let noteItems = try #require(sections.first { $0.title == "Notes" }?.items)
-        #expect(noteItems.first?.title == "Command Palette Spec")
+        #expect(sections.isEmpty)
     }
 
     @MainActor

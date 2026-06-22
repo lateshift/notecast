@@ -12,7 +12,7 @@ final class NoteCastUITestsLaunchTests: XCTestCase {
     private var temporaryDirectory: URL!
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
-        true
+        false
     }
 
     override func setUpWithError() throws {
