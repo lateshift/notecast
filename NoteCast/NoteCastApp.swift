@@ -27,6 +27,7 @@ struct NoteCastApp: App {
 
     init() {
         let container = NotePersistence.makeModelContainerOrCrash()
+        UITestingSupport.seedBrowserNotesIfRequested(in: container)
         let notificationScheduler: NoteNotificationScheduling = UITestingSupport.isEnabled || PreviewRuntime.isActive
             ? NoOpNoteNotificationScheduler()
             : NoteNotificationController()
@@ -327,9 +328,18 @@ private struct MainWindowAccessor: NSViewRepresentable {
 private struct NoteBrowserCommands: Commands {
     @FocusedBinding(\.noteBrowserEditorMode) private var editorMode
     @FocusedBinding(\.noteBrowserSidebarVisibility) private var sidebarVisibility
+    @FocusedBinding(\.noteBrowserCommandPalettePresented) private var commandPalettePresented
 
     var body: some Commands {
         CommandGroup(replacing: .sidebar) {
+            Button("Command Palette...") {
+                commandPalettePresented = !(commandPalettePresented ?? false)
+            }
+            .keyboardShortcut("k", modifiers: [.command])
+            .disabled(commandPalettePresented == nil)
+
+            Divider()
+
             Button(sidebarVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar") {
                 toggleSidebar()
             }
