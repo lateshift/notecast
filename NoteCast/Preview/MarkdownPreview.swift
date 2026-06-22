@@ -95,7 +95,10 @@ enum MarkdownPreviewHTML {
     /// app bundle as a resource. Keeping it standalone makes future stylesheet
     /// refreshes easy and keeps this Swift file focused on app behavior.
     private static var githubMarkdownCSS: String {
-        guard let url = Bundle.main.url(forResource: "github-markdown", withExtension: "css"),
+        let stylesheetURL = Bundle.main.url(forResource: "github-markdown", withExtension: "css")
+            ?? Bundle.main.url(forResource: "github-markdown", withExtension: "css", subdirectory: "Preview")
+
+        guard let url = stylesheetURL,
               let css = try? String(contentsOf: url, encoding: .utf8) else {
             return """
             .markdown-body {
